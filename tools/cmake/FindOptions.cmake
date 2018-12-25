@@ -31,6 +31,12 @@ endif()
 if(ROARING_DISABLE_NEON)
   set (OPT_FLAGS "${OPT_FLAGS} -DDISABLENEON" )
 endif()
+if(ROARING_DISABLE_VSX)
+  set (OPT_FLAGS "${OPT_FLAGS} -DDISABLEVSX" )
+endif()
+if(ROARING_DISABLE_VSX3)
+  set (OPT_FLAGS "${OPT_FLAGS} -DDISABLEVSX3" )
+endif()
 
 if(FORCE_AVX) # some compilers like clang do not automagically define __AVX2__ and __BMI2__ even when the hardware supports it
 if(NOT MSVC)

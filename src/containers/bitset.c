@@ -370,6 +370,84 @@ int bitset_container_##opname##_justcard(const bitset_container_t *src_1,     \
     return vgetq_lane_u64(n, 0) + vgetq_lane_u64(n, 1);                       \
 }
 
+#elif defined(USEVSX)
+
+// todo
+#define VSX_ANDNOT(v0, v1) vec_nand(v0, v1)
+
+#define VSX_LD_ST(step, intrin)                                               \
+    vec_udword2 c##step = intrin(vsx_ld(step * 2, array_1),                   \
+                                 vsx_ld(step * 2, array_2));                  \
+    vsx_st(step * 2, out, c##step)
+
+#define VSX_LD_PCNT(step, intrin)                                             \
+    vec_udword2 c##step = intrin(vsx_ld(step * 2, array_1),                   \
+                                 vsx_ld(step * 2, array_2));                  \
+    n##step = vec_add(n##step, vec_popcnt(c##step))
+
+#define VSX_LD_ST_PCNT(step, intrin)                                          \
+    VSX_LD_PCNT(step, intrin);                                                \
+    vsx_st(step * 2, out, c##step)
+
+#define BITSET_CONTAINER_FN(opname, opsymbol, _x, __x, vsx_intrin, ...)       \
+int bitset_container_##opname(const bitset_container_t *src_1,                \
+                                       const bitset_container_t *src_2,       \
+                                             bitset_container_t *dst) {       \
+    const uint64_t * __restrict__ array_1 = src_1->array;                     \
+    const uint64_t * __restrict__ array_2 = src_2->array;                     \
+    uint64_t *out = dst->array;                                               \
+    vec_udword2 n0 = vec_splat_u64(0);                                        \
+    vec_udword2 n1 = vec_splat_u64(0);                                        \
+    vec_udword2 n2 = vec_splat_u64(0);                                        \
+    vec_udword2 n3 = vec_splat_u64(0);                                        \
+    for (size_t i = 0; i < BITSET_CONTAINER_SIZE_IN_WORDS; i += 8) {          \
+        VSX_LD_ST_PCNT(0, intrin);                                            \
+        VSX_LD_ST_PCNT(1, intrin);                                            \
+        VSX_LD_ST_PCNT(2, intrin);                                            \
+        VSX_LD_ST_PCNT(3, intrin);                                            \
+        array_1 += 128; array_2 += 128; out += 128;                           \
+    }                                                                         \
+    n0 = vec_add(n0, n1); n2 = vec_add(n2, n3); n0 = vec_add(n0, n2);         \
+    dst->cardinality = vec_extract(0, n0) + vec_extract(1, n0);               \
+    return dst->cardinality;                                                  \
+}                                                                             \
+int bitset_container_##opname##_justcard(const bitset_container_t *src_1,     \
+                                       const bitset_container_t *src_2,       \
+                                             bitset_container_t *dst) {       \
+    const uint64_t * __restrict__ array_1 = src_1->array;                     \
+    const uint64_t * __restrict__ array_2 = src_2->array;                     \
+    vec_udword2 n0 = vec_splat_u64(0);                                        \
+    vec_udword2 n1 = vec_splat_u64(0);                                        \
+    vec_udword2 n2 = vec_splat_u64(0);                                        \
+    vec_udword2 n3 = vec_splat_u64(0);                                        \
+    for (size_t i = 0; i < BITSET_CONTAINER_SIZE_IN_WORDS; i += 8) {          \
+        VSX_LD_PCNT(0, intrin);                                               \
+        VSX_LD_PCNT(1, intrin);                                               \
+        VSX_LD_PCNT(2, intrin);                                               \
+        VSX_LD_PCNT(3, intrin);                                               \
+        array_1 += 128; array_2 += 128;                                       \
+    }                                                                         \
+    n0 = vec_add(n0, n1); n2 = vec_add(n2, n3); n0 = vec_add(n0, n2);         \
+    dst->cardinality = vec_extract(0, n0) + vec_extract(1, n0);               \
+    return dst->cardinality;                                                  \
+}                                                                             \
+int bitset_container_##opname##_nocard(const bitset_container_t *src_1,       \
+                                       const bitset_container_t *src_2,       \
+                                             bitset_container_t *dst) {       \
+    const uint64_t * __restrict__ array_1 = src_1->array;                     \
+    const uint64_t * __restrict__ array_2 = src_2->array;                     \
+    uint64_t *out = dst->array;                                               \
+    for (size_t i = 0; i < BITSET_CONTAINER_SIZE_IN_WORDS; i += 8) {          \
+        VSX_LD_ST(0, vsx_intrin);                                             \
+        VSX_LD_ST(1, vsx_intrin);                                             \
+        VSX_LD_ST(2, vsx_intrin);                                             \
+        VSX_LD_ST(3, vsx_intrin);                                             \
+        array_1 += 128; array_2 += 128; out += 128;                           \
+    }                                                                         \
+    dst->cardinality = BITSET_UNKNOWN_CARDINALITY;                            \
+    return dst->cardinality;                                                  \
+}
+
 #else /* not USEAVX  */
 
 #define BITSET_CONTAINER_FN(opname, opsymbol, avx_intrinsic, neon_intrinsic)  \

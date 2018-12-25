@@ -88,6 +88,18 @@
 #  include <arm_neon.h>
 #endif
 
+#if !defined(USEVSX) && !defined(DISABLEVSX) && defined(__PPC64__) && defined(__LITTLE_ENDIAN__)
+    #define USEVSX
+#endif
+#ifdef USEVSX
+    #include <altivec.h>
+    #ifdef __cplusplus
+        #undef vector
+        #undef pixel
+        #undef bool
+    #endif
+#endif
+
 #ifndef _MSC_VER
 /* Non-Microsoft C/C++-compatible compiler, assumes that it supports inline
  * assembly */
